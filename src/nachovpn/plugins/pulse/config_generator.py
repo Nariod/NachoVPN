@@ -45,7 +45,7 @@ CFG_LOGON_SCRIPT = 0x400C
 CFG_LOGON_SCRIPT_MAC = 0x401B
 
 EXAMPLE_ROUTES = [
-    {'type': ROUTE_SPLIT_INCLUDE, 'route': '0.0.0.0/0.0.0.0'},
+    {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.84.64.175/255.255.255.255'},
     # {'type': ROUTE_SPLIT_EXCLUDE, 'route': '10.0.0.0/255.0.0.0'}
 ]
 
