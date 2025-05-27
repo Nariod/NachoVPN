@@ -44,9 +44,15 @@ CFG_INTERNAL_GATEWAY_IP = 0x400B
 CFG_LOGON_SCRIPT = 0x400C
 CFG_LOGON_SCRIPT_MAC = 0x401B
 
+# Fixed routing configuration - exclude common internet ranges from VPN
 EXAMPLE_ROUTES = [
     {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.84.64.175/255.255.255.255'},
-    # {'type': ROUTE_SPLIT_EXCLUDE, 'route': '10.0.0.0/255.0.0.0'}
+    # Add more specific routes that should go through VPN
+    # {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.0.0.0/255.0.0.0'},
+    
+    # Exclude common internet traffic from VPN to maintain internet connectivity
+    {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/128.0.0.0'},  # Exclude first half of internet
+    {'type': ROUTE_SPLIT_EXCLUDE, 'route': '128.0.0.0/128.0.0.0'}, # Exclude second half of internet
 ]
 
 class ESPConfigGenerator:
@@ -66,11 +72,15 @@ class ESPConfigGenerator:
         return config
 
 class VPNConfigGenerator:
-    def __init__(self, logon_script="C:\\Windows\\System32\\calc.exe", logon_script_macos="",dns_suffix="nachovpn.local", routes=EXAMPLE_ROUTES):
+    def __init__(self, 
+                 logon_script="C:\\Windows\\System32\\calc.exe", 
+                 logon_script_macos="",
+                 routes=EXAMPLE_ROUTES,
+                 preserve_internet=True):
         self.logon_script = logon_script
         self.logon_script_macos = logon_script_macos
-        self.dns_suffix = dns_suffix
         self.routes = routes
+        self.preserve_internet = preserve_internet
 
     @staticmethod
     def hexdump(data, length=16):
@@ -124,7 +134,19 @@ class VPNConfigGenerator:
 
     def create_routes(self):
         route_data = b''
-        for route in self.routes:
+        
+        # If preserve_internet is True, make sure we have proper exclusion routes
+        if self.preserve_internet and not any(route['type'] == ROUTE_SPLIT_EXCLUDE for route in self.routes):
+            # Add default internet exclusion routes if none exist
+            default_exclude_routes = [
+                {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/128.0.0.0'},
+                {'type': ROUTE_SPLIT_EXCLUDE, 'route': '128.0.0.0/128.0.0.0'},
+            ]
+            routes_to_process = self.routes + default_exclude_routes
+        else:
+            routes_to_process = self.routes
+            
+        for route in routes_to_process:
             route_type = route['type']
             ip, subnet_mask = route['route'].split('/')
             ip_bytes = self.ip_to_bytes(ip)
@@ -143,7 +165,7 @@ class VPNConfigGenerator:
         routes_section = bytearray()
         routes_section += self.write_be16(0x2e00)                    # Attribute flag
         routes_section += self.write_be16(routes_len)                # Routes length
-        routes_section += self.write_be32(len(self.routes))          # Number of routes (think this should be big endian)
+        routes_section += self.write_be32(len(routes_to_process))    # Number of routes
         routes_section += route_data
         return routes_section
 
@@ -163,9 +185,6 @@ class VPNConfigGenerator:
         config_len_offset = len(data)
         data += self.write_be32(0)                   # placeholder for length: (len(config) - 0x10)
 
-        #logging.debug('config header:')
-        #self.hexdump(data)
-
         # Version marker + attribute
         offset = len(data)
         data += self.write_be16(0x2e00)              # 0x2e00: known for Pulse version >= 9.1R16
@@ -173,9 +192,6 @@ class VPNConfigGenerator:
         data += self.write_be32(0x03000000)          # fixed value
         data += self.create_attribute(0x4025, b'\x01')
         data[offset + 2:offset + 4] = self.write_be16(len(data) - offset)
-
-        #logging.debug('version marker + attribute >= 9.1R16:')
-        #self.hexdump(data[offset:])
 
         # Version marker + attribute
         offset = len(data)
@@ -185,32 +201,36 @@ class VPNConfigGenerator:
         data += self.create_attribute(0x4026, b'\x01')
         data[offset + 2:offset + 4] = self.write_be16(len(data) - offset)
 
-        #logging.debug('version marker + attribute >= 9.1R14:')
-        #self.hexdump(data[offset:])
-
         # Routing info
         assert len(data) == 0x46
         data += self.create_routes()
 
-        #logging.debug('routing info:')
-        #self.hexdump(data)
-
-        # Final attributes
-        # fwiw, openconnect seems to differ here
+        # Final attributes with improved DNS configuration
         final_attrs = bytearray()
         final_attrs += self.write_be32(0)
         final_attrs += self.write_be16(0)            # placeholder: length of the rest of the config
         final_attrs += self.write_be32(0x03000000)   # fixed value
+        
+        # Core VPN settings
         final_attrs += self.create_attribute(CFG_DISCONNECT_WHEN_ROUTES_CHANGED, b'\x00')
-        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_TAKE_PRECEDENCE, b'\x00')
+        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_TAKE_PRECEDENCE, b'\x01' if not self.preserve_internet else b'\x00')
         final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_WITH_SUBNET_ACCESS, b'\x00')
-        final_attrs += self.create_attribute(CFG_ENFORCE_IPV4, b'\x00')
+        final_attrs += self.create_attribute(CFG_ENFORCE_IPV4, b'\x01')
         final_attrs += self.create_attribute(CFG_ENFORCE_IPV6, b'\x00')
         final_attrs += self.create_attribute(CFG_MTU, self.write_be32(1400))
-        final_attrs += self.create_attribute(CFG_DNS_SERVER, b'\x01\x01\x01\x01')
-        final_attrs += self.create_attribute(CFG_DNS_SUFFIX, self.dns_suffix.encode() + b'\x00')
+        
+        # DNS Configuration - skip DNS server configuration to preserve client DNS
+        # Commenting out DNS server attributes to keep client's existing DNS setup
+        # primary_dns = self.ip_to_bytes(self.dns_servers[0])
+        # final_attrs += self.create_attribute(CFG_DNS_SERVER, primary_dns)
+        
+        # Skip DNS suffix to avoid DNS changes
+        # final_attrs += self.create_attribute(CFG_DNS_SUFFIX, self.dns_suffix.encode() + b'\x00')
         final_attrs += self.create_attribute(CFG_UNKNOWN_4007, self.write_be32(1))
-        final_attrs += self.create_attribute(CFG_WINS_SERVER, b'\x01\x01\x01\x01')
+        
+        # Skip WINS server configuration
+        # final_attrs += self.create_attribute(CFG_WINS_SERVER, primary_dns)
+        
         final_attrs += self.create_attribute(CFG_UNKNOWN_4019, b'\x01')
         final_attrs += self.create_attribute(CFG_ESP_ONLY, b'\x00')
         final_attrs += self.create_attribute(CFG_ESP_ALLOW_6IN4, b'\x01')
@@ -238,9 +258,6 @@ class VPNConfigGenerator:
         final_attrs[4:6] = self.write_be16(len(final_attrs))  # fill in the length of final attrs
         data += final_attrs  # add final attrs to data
 
-        #logging.debug('final attributes:')
-        #self.hexdump(data)
-
         # Update the lengths
         total_length = len(data)
         data[header_len_offset:header_len_offset + 4] = self.write_be32(total_length)
@@ -253,14 +270,47 @@ class VPNConfigGenerator:
         return struct.pack('>HH', attr_type, len(data)) + data
 
 def main():
-    generator = VPNConfigGenerator()
+    # Example usage with different configurations
+    
+    # Configuration 1: Preserve internet access and client DNS (recommended)
+    print("=== Generating config with preserved internet access and DNS ===")
+    generator = VPNConfigGenerator(
+        preserve_internet=True
+    )
     config = generator.create_config()
+    
     output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test')
-    filename = os.path.join(output_dir, 'vpn_config.bin')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    filename = os.path.join(output_dir, 'vpn_config_preserve_all.bin')
     with open(filename, 'wb') as f:
         f.write(config)
-
-    print(f"Generated VPN config. Saved to {filename}")
+    
+    print(f"Generated VPN config with preserved internet access and DNS. Saved to {filename}")
+    
+    # Configuration 2: Custom routes only
+    print("\n=== Generating config with custom routes only ===")
+    custom_routes = [
+        {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.84.64.175/255.255.255.255'},
+        {'type': ROUTE_SPLIT_INCLUDE, 'route': '192.168.1.0/255.255.255.0'},
+        # Explicitly exclude internet traffic
+        {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/0.0.0.0'},
+    ]
+    
+    generator2 = VPNConfigGenerator(
+        routes=custom_routes,
+        preserve_internet=False  # Manual route control
+    )
+    config2 = generator2.create_config()
+    
+    filename2 = os.path.join(output_dir, 'vpn_config_custom_routes.bin')
+    with open(filename2, 'wb') as f:
+        f.write(config2)
+    
+    print(f"Generated custom routes VPN config. Saved to {filename2}")
+    
+    # Show hexdump of the first config
+    print("\n=== Hexdump of preserved internet + DNS config ===")
     generator.hexdump(config)
 
 if __name__ == '__main__':
