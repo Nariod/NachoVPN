@@ -50,9 +50,9 @@ EXAMPLE_ROUTES = [
     # Add more specific routes that should go through VPN
     # {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.0.0.0/255.0.0.0'},
     
-    # Exclude common internet traffic from VPN to maintain internet connectivity
-    {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/128.0.0.0'},  # Exclude first half of internet
-    {'type': ROUTE_SPLIT_EXCLUDE, 'route': '128.0.0.0/128.0.0.0'}, # Exclude second half of internet
+    # Exclude ALL internet traffic from VPN to maintain internet connectivity
+    # This ensures DNS and all other traffic stays on the local interface
+    {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/0.0.0.0'},  # Exclude everything except specific includes
 ]
 
 class ESPConfigGenerator:
@@ -137,10 +137,9 @@ class VPNConfigGenerator:
         
         # If preserve_internet is True, make sure we have proper exclusion routes
         if self.preserve_internet and not any(route['type'] == ROUTE_SPLIT_EXCLUDE for route in self.routes):
-            # Add default internet exclusion routes if none exist
+            # Add complete internet exclusion route if none exist
             default_exclude_routes = [
-                {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/128.0.0.0'},
-                {'type': ROUTE_SPLIT_EXCLUDE, 'route': '128.0.0.0/128.0.0.0'},
+                {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/0.0.0.0'},  # Exclude all internet traffic
             ]
             routes_to_process = self.routes + default_exclude_routes
         else:
@@ -211,10 +210,10 @@ class VPNConfigGenerator:
         final_attrs += self.write_be16(0)            # placeholder: length of the rest of the config
         final_attrs += self.write_be32(0x03000000)   # fixed value
         
-        # Core VPN settings
+        # Core VPN settings - ensure split tunneling works properly
         final_attrs += self.create_attribute(CFG_DISCONNECT_WHEN_ROUTES_CHANGED, b'\x00')
-        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_TAKE_PRECEDENCE, b'\x01' if not self.preserve_internet else b'\x00')
-        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_WITH_SUBNET_ACCESS, b'\x00')
+        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_TAKE_PRECEDENCE, b'\x00')  # Local routes take precedence
+        final_attrs += self.create_attribute(CFG_TUNNEL_ROUTES_WITH_SUBNET_ACCESS, b'\x01')  # Enable subnet access
         final_attrs += self.create_attribute(CFG_ENFORCE_IPV4, b'\x01')
         final_attrs += self.create_attribute(CFG_ENFORCE_IPV6, b'\x00')
         final_attrs += self.create_attribute(CFG_MTU, self.write_be32(1400))
@@ -291,7 +290,6 @@ def main():
     # Configuration 2: Custom routes only
     print("\n=== Generating config with custom routes only ===")
     custom_routes = [
-        {'type': ROUTE_SPLIT_INCLUDE, 'route': '10.84.64.175/255.255.255.255'},
         {'type': ROUTE_SPLIT_INCLUDE, 'route': '192.168.1.0/255.255.255.0'},
         # Explicitly exclude internet traffic
         {'type': ROUTE_SPLIT_EXCLUDE, 'route': '0.0.0.0/0.0.0.0'},
